@@ -10,6 +10,7 @@ var patch = snabbdom.init([
 var h = require('../h').default;
 var toVNode = require('../tovnode').default;
 var vnode = require('../vnode').default;
+var htmlDomApi = require('../htmldomapi').htmlDomApi;
 
 function prop(name) {
   return function(obj) {
@@ -336,7 +337,28 @@ describe('snabbdom', function() {
         assert.strictEqual(elm.childNodes.length, 1);
         assert.strictEqual(elm.childNodes[0].nodeType, 1);
         assert.strictEqual(elm.childNodes[0].textContent, 'Hello');
-      })
+      });
+      it('can work with domApi', function () {
+        var domApi = Object.assign({}, htmlDomApi, {
+            tagName: function(elm) { return 'x-' + elm.tagName.toUpperCase(); }
+        });
+        var h2 = document.createElement('h2');
+        h2.id = 'hx';
+        h2.setAttribute('data-env', "xyz");
+        var text = document.createTextNode("Foobar");
+        var elm = document.createElement('div');
+        elm.id = 'id';
+        elm.className = 'class other';
+        elm.setAttribute('data', 'value');
+        elm.appendChild(h2);
+        elm.appendChild(text);
+        var vnode = toVNode(elm, domApi);
+        assert.equal(vnode.sel, 'x-div#id.class.other');
+        assert.deepEqual(vnode.data, {attrs: {'data': 'value'}});
+        assert.equal(vnode.children[0].sel, 'x-h2#hx');
+        assert.deepEqual(vnode.children[0].data, {attrs: {'data-env': 'xyz'}});
+        assert.equal(vnode.children[1].text, 'Foobar');
+      });
     });
     describe('updating children with keys', function() {
       function spanNum(n) {
@@ -895,6 +917,21 @@ describe('snabbdom', function() {
         patch(vnode0, vnode1);
         patch(vnode1, vnode2);
         assert.equal(1, result.length);
+      });
+      it('calls `destroy` listener when patching text node over node with children', function() {
+        var calls = 0;
+        function cb(vnode) {
+          calls++;
+        }
+        var vnode1 = h('div', [
+          h('div', {hook: {destroy: cb}}, [
+            h('span', 'Child 1'),
+          ]),
+        ]);
+        var vnode2 = h('div', 'Text node')
+        patch(vnode0, vnode1);
+        patch(vnode1, vnode2);
+        assert.equal(calls, 1);
       });
       it('calls `init` and `prepatch` listeners on root', function() {
           var count = 0;

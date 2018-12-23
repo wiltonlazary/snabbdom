@@ -61,6 +61,7 @@ performance, small size and all the features listed below.
   * Server-side HTML output provided by [snabbdom-to-html](https://github.com/acstll/snabbdom-to-html).
   * Compact virtual DOM creation with [snabbdom-helpers](https://github.com/krainboltgreene/snabbdom-helpers).
   * Template string support using [snabby](https://github.com/jamen/snabby).
+  * Virtual DOM assertion with [snabbdom-looks-like](https://github.com/jvanbruegge/snabbdom-looks-like)
 
 ## Inline example
 
@@ -169,7 +170,7 @@ var patch = snabbdom.init([ // Init patch function with chosen modules
 var h = require('snabbdom/h').default; // helper function for creating vnodes
 var toVNode = require('snabbdom/tovnode').default;
 
-var newNode = h('div', {style: {color: '#000'}}, [
+var newVNode = h('div', {style: {color: '#000'}}, [
   h('h1', 'Headline'),
   h('p', 'A paragraph'),
 ]);
@@ -454,6 +455,14 @@ h('div', [
 ]);
 ```
 
+Each handler is called not only with the given arguments but also with the current event and vnode appended to the argument list. It also supports using multiple listeners per event by specifying an array of handlers:
+```javascript
+stopPropagation = function(ev) { ev.stopPropagation() }
+sendValue = function(func, ev, vnode) { func(vnode.elm.value) }
+
+h('a', { on:{ click:[[sendValue, console.log], stopPropagation] } });
+```
+
 Snabbdom allows swapping event handlers between renders. This happens without
 actually touching the event handlers attached to the DOM.
 
@@ -700,6 +709,50 @@ Here are some approaches to building applications with Snabbdom.
 * [Tung](https://github.com/Reon90/tung) –
   A JavaScript library for rendering html. Tung helps to divide html and JavaScript development.
 * [sprotty](https://github.com/theia-ide/sprotty) - "A web-based diagramming framework" uses Snabbdom.
+* [Mark Text](https://github.com/marktext/marktext) - "Realtime preview Markdown Editor" build on Snabbdom.
+* [puddles](https://github.com/flintinatux/puddles) - 
+  "Tiny vdom app framework. Pure Redux. No boilerplate." - Built with :heart: on Snabbdom.
+* [Backbone.VDOMView](https://github.com/jcbrand/backbone.vdomview) - A [Backbone](http://backbonejs.org/) View with VirtualDOM capability via Snabbdom.
 
 Be sure to share it if you're building an application in another way
 using Snabbdom.
+
+## Common errors
+
+```
+Uncaught NotFoundError: Failed to execute 'insertBefore' on 'Node':
+    The node before which the new node is to be inserted is not a child of this node.
+```
+The reason for this error is reusing of vnodes between patches (see code example), snabbdom stores actual dom nodes inside the virtual dom nodes passed to it as performance improvement, so reusing nodes between patches is not supported.
+```js
+var sharedNode = h('div', {}, 'Selected');
+var vnode1 = h('div', [
+  h('div', {}, ['One']),
+  h('div', {}, ['Two']),
+  h('div', {}, [sharedNode]),
+]);
+var vnode2 = h('div', [
+  h('div', {}, ['One']),
+  h('div', {}, [sharedNode]),
+  h('div', {}, ['Three']),
+]);
+patch(container, vnode1);
+patch(vnode1, vnode2);
+```
+You can fix this issue by creating a shallow copy of the object (here with object spread syntax):
+```js
+var vnode2 = h('div', [
+  h('div', {}, ['One']),
+  h('div', {}, [{ ...sharedNode }]),
+  h('div', {}, ['Three']),
+]);
+```
+Another solution would be to wrap shared vnodes in a factory function:
+```js
+var sharedNode = () => h('div', {}, 'Selected');
+var vnode1 = h('div', [
+  h('div', {}, ['One']),
+  h('div', {}, ['Two']),
+  h('div', {}, [sharedNode()]),
+]);
+```

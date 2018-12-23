@@ -240,11 +240,13 @@ export function init(modules: Array<Partial<Module>>, domApi?: DOMAPI) {
         }
       }
     }
-    if (oldStartIdx > oldEndIdx) {
-      before = newCh[newEndIdx+1] == null ? null : newCh[newEndIdx+1].elm;
-      addVnodes(parentElm, before, newCh, newStartIdx, newEndIdx, insertedVnodeQueue);
-    } else if (newStartIdx > newEndIdx) {
-      removeVnodes(parentElm, oldCh, oldStartIdx, oldEndIdx);
+    if (oldStartIdx <= oldEndIdx || newStartIdx <= newEndIdx) {
+      if (oldStartIdx > oldEndIdx) {
+        before = newCh[newEndIdx+1] == null ? null : newCh[newEndIdx+1].elm;
+        addVnodes(parentElm, before, newCh, newStartIdx, newEndIdx, insertedVnodeQueue);
+      } else {
+        removeVnodes(parentElm, oldCh, oldStartIdx, oldEndIdx);
+      }
     }
   }
 
@@ -274,6 +276,9 @@ export function init(modules: Array<Partial<Module>>, domApi?: DOMAPI) {
         api.setTextContent(elm, '');
       }
     } else if (oldVnode.text !== vnode.text) {
+      if (isDef(oldCh)) {
+        removeVnodes(elm, oldCh as Array<VNode>, 0, (oldCh as Array<VNode>).length - 1);
+      }
       api.setTextContent(elm, vnode.text as string);
     }
     if (isDef(hook) && isDef(i = hook.postpatch)) {
